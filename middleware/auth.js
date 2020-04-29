@@ -120,7 +120,7 @@ module.exports = async (ctx, next) => {
     try {
       try {
         // 从 cas-we-can 获取信息
-        const casWeCanUrl = `https://xgbxscwx.seu.edu.cn/cas-we-can/serviceValidate?ticket=${ticket}&service=${service}&json=1`
+        const casWeCanUrl = `https://seicwxbz.seu.edu.cn/cas-we-can/serviceValidate?ticket=${ticket}&service=${service}&json=1`
         const res = await axios.get(casWeCanUrl)
         const data = res.data
         casWeCanRes = data
