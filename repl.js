@@ -54,63 +54,32 @@ exports.start = () => {
         } else if (/^auth$/.test(path) && !method) {
           oracle.getConnection().then(async (db) => {
             const cardnum = params
-            let name, schoolnum=null
-            if (cardnum.startsWith('21')) {
-              // 本科生库
-              const record = await db.execute(
-                `SELECT XM, XJH FROM T_BZKS_TMP
-        WHERE XH=:cardnum`, [cardnum]
-              )
-              if (record.rows.length > 0) {
-                name = record.rows[0][0]
-                schoolnum = record.rows[0][1]
-              }
-            }  else if (cardnum.startsWith('10')) {
-              // 教职工库
-              const record = await db.execute(
-                `SELECT XM FROM T_JZG_JBXX_TMP
-        WHERE ZGH=:cardnum`, [cardnum]
-              )
-              if (record.rows.length > 0) {
-                name = record.rows[0][0]
-              }
-            }
-
-            if (!name) {
-              console.log('身份完整性校验失败')
-              callback(null)
-              await db.close()
-              return
-            }
-
             // 生成 32 字节 token 转为十六进制，及其哈希值
             let token = Buffer.from(crypto.randomBytes(20)).toString('hex')
             let tokenHash = hash(token)
 
             // 防止数据库被挤爆，也为了安全性，先删除用户已有的 repl token
-            await db.execute(`DELETE FROM XSC_AUTH WHERE CARDNUM = :cardnum AND PLATFORM = 'repl'`,
+            await db.execute(`DELETE FROM VOTE_AUTH WHERE CARDNUM = :cardnum AND PLATFORM = 'repl'`,
               {cardnum})
             
             // 将新用户信息插入数据库
             let now = moment()
             // 向数据库插入记录
             const dbResult = await db.execute(
-              `INSERT INTO XSC_AUTH 
-              (TOKEN_HASH, CARDNUM, REAL_NAME, CREATED_TIME, PLATFORM, LAST_INVOKED_TIME, SCHOOLNUM, FROM_WECHAT)
-              VALUES (:tokenHash, :cardnum, :name, :createdTime, 'repl', :lastInvokedTime, :schoolnum, :fromWechat )
+              `INSERT INTO VOTE_AUTH 
+                (TOKEN_HASH, CARDNUM, CREATED_TIME, PLATFORM, LAST_INVOKED_TIME, FROM_WECHAT)
+                VALUES (:tokenHash, :cardnum, :createdTime, 'repl', :lastInvokedTime, :fromWechat )
               `,
               { 
                 tokenHash,
                 cardnum,
-                name,
                 createdTime:now.toDate(),
                 lastInvokedTime:now.toDate(),
-                schoolnum,
                 fromWechat:0
               }
             )
             if(dbResult.rowsAffected === 1){
-              console.log(`当前认证身份：${cardnum} - ${name} - ${schoolnum}`)
+              console.log(`当前认证身份：${cardnum}`)
               console.log(`如需调试，在浏览器控制台执行： auth('${token}')`)
               testClient.defaults.headers = { 'x-api-token': token }
             }

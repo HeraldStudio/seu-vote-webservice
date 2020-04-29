@@ -9,7 +9,7 @@ module.exports = {
     if(!connectionPool){
       connectionPool = await oracledb.createPool({ 
         _enableStats: true,
-        ...dbSecret.xgbxsc
+        ...dbSecret.seicwx
       })
 
       if (program.mode === 'production') {

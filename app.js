@@ -88,7 +88,7 @@ app.use(require('./middleware/auth'))
 //（开发环境下是假 redis，不需要安装redis）
 // app.use(require('./middleware/redis'))
 // 4. 权限控制
-app.use(require('./middleware/permission'))
+//app.use(require('./middleware/permission'))
 // 5. 用户信息
 app.use(require('./middleware/user'))
 
