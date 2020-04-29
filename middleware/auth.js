@@ -5,7 +5,7 @@
   保持完整的前后端分离特性，同时提供灵活性。
   1. webservice 接受来自前端的 ticket 和 service，和 ids 服务器换取用户的「一卡通号」
   2. 依次从 T_BZKS 、T_YJS 、T_JZG_JBXX 表中根据一卡通号查询记录，进行完整性校验
-  3. 生成 token 下发给用户，将 tokenHash = SHA256(token) 插入 XSC_AUTH
+  3. 生成 token 下发给用户，将 tokenHash = SHA256(token) 插入 VOTE_AUTH
 
   ## 鉴权流程
   1. 从请求头中获取 x-api-token 字段
@@ -22,8 +22,6 @@
   ctx.user.isLogin    boolean             仅已登录用户带 token 请求时有效，否则为 false
   ctx.user.tokenHash  string?             登录设备唯一识别码。若同一个用户多处登录，该识别码不相同
   ctx.user.cardnum    string?             用户一卡通号码
-  ctx.user.name       string?             用户姓名
-  ctx.user.schoolnum  string?             用户学号（教师为空）
   ctx.user.platform   string?             用户登录时使用的平台识别符
   
   注：
@@ -145,37 +143,6 @@ module.exports = async (ctx, next) => {
       }
     }
 
-    // 从数据库查找学号、姓名
-    let name, schoolnum
-    if (cardnum.startsWith('21')) {
-      // 本科生库
-      const record = await ctx.db.execute(
-        `SELECT XM, XJH FROM T_BZKS_TMP
-        WHERE XH=:cardnum`, [cardnum]
-      )
-      if (record.rows.length > 0) {
-        name = record.rows[0][0]
-        schoolnum = record.rows[0][1]
-      }
-    } else if (cardnum.startsWith('10')) {
-      // 教职工库
-      const record = await ctx.db.execute(
-        `SELECT XM FROM T_JZG_JBXX_TMP
-        WHERE ZGH=:cardnum`, [cardnum]
-      )
-      if (record.rows.length > 0) {
-        name = record.rows[0][0]
-      }
-    }
-
-    if (!name) {
-      throw {
-        status: 500,
-        error:'IDENTITY_INVALID',
-        reason:'身份完整性校验失败'
-      }
-    }
-
     // 生成 32 字节 token 转为十六进制，及其哈希值
     let token = Buffer.from(crypto.randomBytes(20)).toString('hex')
     let tokenHash = hash(token)
@@ -185,35 +152,22 @@ module.exports = async (ctx, next) => {
 
     // 向数据库插入记录
     await ctx.db.execute(
-      `INSERT INTO XSC_AUTH 
-      (TOKEN_HASH, CARDNUM, REAL_NAME, CREATED_TIME, PLATFORM, LAST_INVOKED_TIME, SCHOOLNUM, FROM_WECHAT)
-      VALUES (:tokenHash, :cardnum, :name, :createdTime, :platform, :lastInvokedTime, :schoolnum, :fromWechat )
+      `INSERT INTO VOTE_AUTH 
+      (TOKEN_HASH, CARDNUM, CREATED_TIME, PLATFORM, LAST_INVOKED_TIME, FROM_WECHAT)
+      VALUES (:tokenHash, :cardnum, :createdTime, :platform, :lastInvokedTime, :fromWechat )
       `,
       {
         tokenHash,
         cardnum,
-        name,
         createdTime: now.toDate(),
         lastInvokedTime: now.toDate(),
-        schoolnum,
         platform,
         fromWechat
       }
     )
-    if (openid) {
-      try {
-        // 如果有 OpenID 则一并存储
-        await ctx.db.execute(/*sql*/`INSERT INTO XSC_OPENID (
-          CARDNUM, OPENID
-        ) VALUES ( :cardnum, :openid )`,
-        { cardnum, openid })
-      } catch (e) {
-        // 不允许重复插入
-      }
-    }
 
     ctx.body = token
-    ctx.logMsg = `${name} [${cardnum}] - 身份认证成功 - 登录平台 ${platform}`
+    ctx.logMsg = `[${cardnum}] - 身份认证成功 - 登录平台 ${platform}`
     return
 
   } else if (ctx.request.headers['x-api-token']) {
@@ -227,8 +181,8 @@ module.exports = async (ctx, next) => {
     if (!record) {
       // 缓存没有命中
       record = await ctx.db.execute(`
-      SELECT CARDNUM, REAL_NAME, CREATED_TIME, LAST_INVOKED_TIME, SCHOOLNUM, PLATFORM, FROM_WECHAT
-      FROM XSC_AUTH
+      SELECT CARDNUM, CREATED_TIME, LAST_INVOKED_TIME, PLATFORM, FROM_WECHAT
+      FROM VOTE_AUTH
       WHERE TOKEN_HASH=:tokenHash`,
       { tokenHash }
       )
@@ -236,10 +190,8 @@ module.exports = async (ctx, next) => {
         // 数据库找到啦
         record = {
           cardnum: record.rows[0][0],
-          name: record.rows[0][1],
           createdTime: moment(record.rows[0][2]).unix(),
           lastInvokedTime: moment(record.rows[0][3]).unix(),
-          schoolnum: record.rows[0][4],
           platform: record.rows[0][5],
           fromWechat: record.rows[0][6]
         }
@@ -255,7 +207,7 @@ module.exports = async (ctx, next) => {
       // 每 4 小时更新一次用户上次调用时间
       if (now - lastInvokedTime >= 4 * 60 * 60 * 1000) {
         await ctx.db.execute(`
-          UPDATE XSC_AUTH
+          UPDATE VOTE_AUTH
           SET LAST_INVOKED_TIME = :now
           WHERE TOKEN_HASH = :tokenHash`
         , { now: now.toDate(), tokenHash })
@@ -263,14 +215,14 @@ module.exports = async (ctx, next) => {
       }
 
       let {
-        cardnum, name, schoolnum, platform, fromWechat
+        cardnum, platform, fromWechat
       } = record
 
       // 将用户信息暴露给下层中间件
       ctx.user = {
         isLogin: true,
         token: tokenHash,
-        cardnum, name, schoolnum, platform, encrypt, decrypt, fromWechat
+        cardnum, platform, encrypt, decrypt, fromWechat
       }
 
       // 调用下游中间件
@@ -287,8 +239,6 @@ module.exports = async (ctx, next) => {
   ctx.user = {
     isLogin: false,
     get cardnum() { reject() },
-    get name() { reject() },
-    get schoolnum() { reject() },
     get platform() { reject() },
     get encrypt() { reject() },
     get decrypt() { reject() },

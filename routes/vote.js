@@ -6,5 +6,7 @@ exports.route = {
    * 
    * @returns  {String}           cardnum   一卡通号
    */
-    
+    async post(choice) {
+        
+    }
 };
