@@ -9,8 +9,6 @@ exports.route = {
             "在读本科生": identityData.rows[0][0],
             "在读研究生": identityData.rows[0][1],
             "学校教职工": identityData.rows[0][2],
-            "校友": identityData.rows[0][3],
-            "其他": identityData.rows[0][4],
         })
         tableData.push({
             "红蓝学院风": themeData.rows[0][0],
