@@ -92,7 +92,7 @@ module.exports = async (ctx, next) => {
    */
   // 对于 auth 路由的请求，直接截获，不交给 kf-router
   if (ctx.path === '/auth') {
-    console.log('request auth')
+    //console.log('request auth')
     // POST /auth 登录认证
     if (ctx.method.toUpperCase() !== 'POST') {
       throw 405
@@ -115,7 +115,7 @@ module.exports = async (ctx, next) => {
     // 该服务接入两种验证服务，由于公众号入口可能性大，先尝试cas-we-can验证
     let cardnum, openid, fromWechat = 0
     let casWeCanRes = '', idsRes = ''
-    console.log(ticket, service)
+    //console.log(ticket, service)
     try {
       try {
         // 从 cas-we-can 获取信息
@@ -150,7 +150,6 @@ module.exports = async (ctx, next) => {
 
     // 将新用户信息插入数据库
     let now = moment()
-
     // 向数据库插入记录
     await ctx.db.execute(
       `INSERT INTO VOTE_AUTH 
@@ -166,7 +165,6 @@ module.exports = async (ctx, next) => {
         fromWechat
       }
     )
-
     ctx.body = token
     ctx.logMsg = `[${cardnum}] - 身份认证成功 - 登录平台 ${platform}`
     return
@@ -194,7 +192,7 @@ module.exports = async (ctx, next) => {
           createdTime: moment(record.rows[0][1]).unix(),
           lastInvokedTime: moment(record.rows[0][2]).unix(),
           platform: record.rows[0][3],
-          fromWechat: record.rows[0][4]
+          fromWechat: record.rows[0][4],
         }
         tokenHashPool[tokenHash] = record
       } else {
