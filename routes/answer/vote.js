@@ -2,14 +2,17 @@ exports.route = {
     async post(choice) {
         console.log(choice)
         console.log(this.user.cardnum);
-        const voted = await this.db.execute(`SELECT IS_VOTED FROM VOTED WHERE cardnum=${this.user.cardnum}`);
+        const voted = await this.db.execute(`SELECT IS_VOTED FROM VOTED WHERE cardnum=:cardnum`, {cardnum: this.user.cardnum});
         if (voted.rows.length === 0) {
             await this.db.execute(`INSERT INTO VOTED
                 (CARDNUM, IS_VOTED) 
-                VALUES (${this.user.cardnum}, 1)
-                `)
+                VALUES (:cardnum, 1)
+                `,
+                {
+                  cardnum: this.user.cardnum
+                })
         }
-        else if (this.user.cardnum !== '213192688') throw '您已经填过啦'
+        else throw '您已经填过啦'
         for (let ans in choice) {
             console.log(ans, choice[ans])
             const res = await this.db.execute(`SELECT ANSWER_${choice[ans][0]} FROM VOTE_RESULT WHERE ID=${ans}`)
@@ -24,6 +27,6 @@ exports.route = {
             }
             else await this.db.execute(`UPDATE VOTE_RESULT SET ANSWER_${choice[ans][0]}=${res.rows[0][0] + 1} WHERE ID=${ans}`);
         }
-        return choice
+        return true
     }
 };
