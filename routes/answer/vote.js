@@ -10,7 +10,7 @@ exports.route = {
                 VALUES (:cardnum, 1)
                 `,
                 {
-                    cardnum: this.user.cardnum
+                    cardnum: cardnum
                 })
         }
         else throw '您已经填过啦'
@@ -24,17 +24,16 @@ exports.route = {
                 `)
             }
             else await this.db.execute(`UPDATE VOTE_RESULT SET ANSWER_A=${res.rows[0][0] + 1} WHERE ID=0`);
-        } else if (cardnum.startsWith('10') || cardnum.startsWith('22') || cardnum.startsWith('31')) {
-            // 教职工
-            const res = await this.db.execute(`SELECT ANSWER_C FROM VOTE_RESULT WHERE ID=0`)
-            if (res.rows.length === 0) {
-                await this.db.execute(`INSERT INTO VOTE_RESULT
-                (ANSWER_A, ANSWER_B, ANSWER_C, ANSWER_D, ANSWER_E, ID) 
-                VALUES (0, 0, 1, 0, 0, 0)
-                `)
-            }
-            else await this.db.execute(`UPDATE VOTE_RESULT SET ANSWER_C=${res.rows[0][0] + 1} WHERE ID=0`);
-        } else {
+            await this.db.execute(`INSERT INTO VOTE_PERSON
+                (CARDNUM, PROBLEM_1, PROBLEM_2) 
+                VALUES (:cardnum, :p1, :p2)`,
+                {
+                    cardnum: cardnum,
+                    p1: "A.本科生",
+                    p2: choice["0"]
+                });
+        } 
+        else if (cardnum.startsWith('22') || cardnum.startsWith('23')) {
             //研究生
             const res = await this.db.execute(`SELECT ANSWER_B FROM VOTE_RESULT WHERE ID=0`)
             if (res.rows.length === 0) {
@@ -44,7 +43,34 @@ exports.route = {
                 `)
             }
             else await this.db.execute(`UPDATE VOTE_RESULT SET ANSWER_B=${res.rows[0][0] + 1} WHERE ID=0`);
+            await this.db.execute(`INSERT INTO VOTE_PERSON
+                (CARDNUM, PROBLEM_1, PROBLEM_2) 
+                VALUES (:cardnum, :p1, :p2)`,
+                {
+                    cardnum: cardnum,
+                    p1: "B.研究生",
+                    p2: choice["0"]
+                });
         }
+        else {
+            // 教职工
+            const res = await this.db.execute(`SELECT ANSWER_C FROM VOTE_RESULT WHERE ID=0`)
+            if (res.rows.length === 0) {
+                await this.db.execute(`INSERT INTO VOTE_RESULT
+                (ANSWER_A, ANSWER_B, ANSWER_C, ANSWER_D, ANSWER_E, ID) 
+                VALUES (0, 0, 1, 0, 0, 0)
+                `)
+            }
+            else await this.db.execute(`UPDATE VOTE_RESULT SET ANSWER_C=${res.rows[0][0] + 1} WHERE ID=0`);
+            await this.db.execute(`INSERT INTO VOTE_PERSON
+                (CARDNUM, PROBLEM_1, PROBLEM_2) 
+                VALUES (:cardnum, :p1, :p2)`,
+                {
+                    cardnum: cardnum,
+                    p1: "C.教职工",
+                    p2: choice["0"]
+                });
+        } 
         for (let ans in choice) {
             console.log(ans, choice[ans])
             const res = await this.db.execute(`SELECT ANSWER_${choice[ans][0]} FROM VOTE_RESULT WHERE ID=1`)
